@@ -21,6 +21,8 @@ archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.google.android.y
 uptodown-dlurl = "https://instagram.en.uptodown.com/android"
 #archive-dlurl = "https://archive.org/download/com.instagram.android_409.0.0.48.170/com.instagram.android_409.0.0.48.170-381602717_1dpi_6feat_da70186c770d2a4ca02015d63f41c275_apkmirror.com.apkm"
 build-mode = "module"
+arch = "arm64-v8a"
+dpi = "480"
 included-patches = "'Hide ads' 'Sanitize sharing links' 'Disable signature check'"
 exclusive-patches = true
 
