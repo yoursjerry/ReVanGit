@@ -114,7 +114,7 @@ jobs:
         run: |
           cd build || { echo "build folder not found"; exit 1; }
 
-          TG_CHAT="@ReVanGit"
+          TG_CHAT="3491551613"
           NL=$'\n'
           APKS=""
           MODULES=""
