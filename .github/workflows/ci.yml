@@ -1,5 +1,4 @@
 name: CI
-
 on:
   workflow_dispatch:
   schedule:
@@ -9,32 +8,46 @@ jobs:
   check:
     permissions: write-all
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          persist-credentials: true
 
-      - name: Determine upstream repo
-        id: upstream_repo
+      - name: Should build?
+        id: should_build
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Priority:
-          # 1) UPSTREAM_REPO secret (owner/repo)
-          # 2) config.json -> upstream_repo
-          # 3) config.toml -> upstream_repo / upstream / repo
-          # 4) Default -> revanced/revanced-patches
-
-          if [ -n "${{ secrets.UPSTREAM_REPO }}" ]; then
-            echo "UPSTREAM=${{ secrets.UPSTREAM_REPO }}" >> $GITHUB_OUTPUT
-            exit 0
+          if ! git checkout origin/update build.md; then
+            echo "first time building!"
+            echo "SHOULD_BUILD=1" >> $GITHUB_OUTPUT
+          else
+            UPDATE_CFG=$(./build.sh config.toml --config-update)
+            if [ "$UPDATE_CFG" ]; then
+              echo "'$UPDATE_CFG'"
+              echo "SHOULD_BUILD=1" >> $GITHUB_OUTPUT
+            else
+              echo "SHOULD_BUILD=0" >> $GITHUB_OUTPUT
+            fi
           fi
 
-          if [ -f config.json ]; then
-            VAL=$(grep -Eo '"upstream_repo"\s*:\s*"[^"]+' config.json | sed -E 's/.*"upstream_repo"\s*:\s*"//')
-            if [ -n "$VAL" ]; then
-              echo "UPSTREAM=$VAL" >> $GITHUB_OUTPUT
+      - name: Clear older runs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh run list -L400 --json databaseId -q '.[].databaseId' | tail -n+10 | xargs -IID gh api "repos/$GITHUB_REPOSITORY/actions/runs/ID" -X DELETE || :
+
+    outputs:
+      SHOULD_BUILD: ${{ steps.should_build.outputs.SHOULD_BUILD }}
+
+  build:
+    permissions: write-all
+    needs: check
+    uses: ./.github/workflows/build.yml
+    if: ${{ needs.check.outputs.SHOULD_BUILD == 1 }}
+    secrets: inherit              echo "UPSTREAM=$VAL" >> $GITHUB_OUTPUT
               exit 0
             fi
           fi
