@@ -16,14 +16,24 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Ensure jq is installed
+        run: |
+          if ! command -v jq >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y jq
+          fi
+
       - name: Determine upstream repo
         id: upstream
+        shell: bash
         run: |
+          # 1) UPSTREAM_REPO secret takes priority
           if [ -n "$UPSTREAM_REPO" ]; then
             echo "repo=$UPSTREAM_REPO" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
+          # 2) config.json (highest config priority)
           if [ -f config.json ]; then
             VAL=$(grep -Eo '"upstream_repo"\s*:\s*"[^"]+' config.json | sed -E 's/.*"upstream_repo"\s*:\s*"//')
             if [ -n "$VAL" ]; then
@@ -32,35 +42,44 @@ jobs:
             fi
           fi
 
+          # 3) config.toml
           if [ -f config.toml ]; then
             VAL=$(grep -E 'upstream_repo|upstream|repo' config.toml | head -n1 | sed -E 's/.*=//; s/[ "']+//g')
+
+            # Extract owner/repo if full GitHub URL
             if echo "$VAL" | grep -q "github.com"; then
               VAL=$(echo "$VAL" | sed -E 's#.*github.com/([^/]+/[^/]+).*#\1#')
             fi
+
             if [ -n "$VAL" ]; then
               echo "repo=$VAL" >> "$GITHUB_OUTPUT"
               exit 0
             fi
           fi
 
+          # 4) Default
           echo "repo=revanced/revanced-patches" >> "$GITHUB_OUTPUT"
 
       - name: Check for Upstream Updates
         id: check
+        shell: bash
         run: |
           REPO="${{ steps.upstream.outputs.repo }}"
           echo "Checking upstream: $REPO"
 
+          # Collect latest tag
           LATEST=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" \
             | jq -r '.tag_name')
 
           if [ -z "$LATEST" ] || [ "$LATEST" = "null" ]; then
+            echo "No latest release found. Skipping."
             echo "updated=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           echo "latest=$LATEST" >> "$GITHUB_OUTPUT"
 
+          # Read previous tag
           if [ -f last_upstream.txt ]; then
             PREVIOUS=$(cat last_upstream.txt)
           else
@@ -69,30 +88,45 @@ jobs:
 
           echo "previous=$PREVIOUS" >> "$GITHUB_OUTPUT"
 
+          # Compare
           if [ "$LATEST" != "$PREVIOUS" ]; then
             echo "updated=true" >> "$GITHUB_OUTPUT"
             echo "$LATEST" > last_upstream.txt
           else
+            echo "No change detected."
             echo "updated=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Commit Cached Version
         if: steps.check.outputs.updated == 'true'
+        shell: bash
         run: |
           git config user.email "github-actions@github.com"
           git config user.name "github-actions"
+
           git add last_upstream.txt
-          git commit -m "Update upstream version to ${{ steps.check.outputs.latest }}"
-          git push
+
+          # Prevent empty-commit crash
+          if ! git diff --cached --quiet; then
+            git commit -m "Update upstream version to ${{ steps.check.outputs.latest }}"
+            git push
+          else
+            echo "Nothing to commit."
+          fi
 
       - name: Trigger Build Workflow
         if: steps.check.outputs.updated == 'true'
         uses: actions/github-script@v7
         with:
           script: |
+            console.log("Triggering build.yml due to upstream update...");
             await github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
               repo: context.repo.repo,
               workflow_id: "build.yml",
-              ref: "main"
+              ref: "main",
+              inputs: {
+                from_ci: false
+              }
             });
+            console.log("Dispatch sent successfully.");
