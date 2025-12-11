@@ -1,0 +1,16 @@
+enable-magisk-update = true # set this to false if you do not want to receive updates for the module in magisk app
+parallel-jobs = 1
+patches-version = "dev"
+
+# add 'enabled = false' for not patching 
+
+[Instagram]
+enable-magisk-update = true
+version = "latest"
+arch = "all"
+dpi = "480"
+build-mode = "both"
+apkmirror-dlurl = "https://apkmirror.com/apk/instagram/instagram-instagram/"
+uptodown-dlurl = "https://instagram.en.uptodown.com/android"
+included-patches = "'Hide ads' 'Sanitize sharing links' 'Disable signature check''Open links externally'"
+exclusive-patches = true
