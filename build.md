@@ -15,4 +15,5 @@ CLI: j-hc/revanced-cli-5.0.0-all.jar
 CLI: j-hc/revanced-cli-5.0.0-all.jar    
 
 Skipped:  
-Patches: ReVanced/patches-5.47.0-dev.13.rvp    
+Patches: ReVanced/patches-5.47.0-dev.13.rvp  
+Patches: ReVanced/patches-5.47.0-dev.13.rvp      
